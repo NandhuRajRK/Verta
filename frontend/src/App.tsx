@@ -1394,7 +1394,9 @@ export default function App() {
                 <Button
                   aria-label="Compile"
                   className="toolbarButton"
-                  onPress={async () => {
+                  onPress={async (e) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    (e as any)?.preventDefault?.();
                     if (sharedPreviewUrl) URL.revokeObjectURL(sharedPreviewUrl);
                     setSharedCompiling(true);
                     try {
@@ -2049,7 +2051,12 @@ export default function App() {
                   <Button
                     aria-label="Compile"
                     className="toolbarButton"
-                    onPress={onCompilePreview}
+                    onPress={(e) => {
+                      // Defensive: prevent any default behavior that could trigger navigation.
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      (e as any)?.preventDefault?.();
+                      void onCompilePreview();
+                    }}
                     isDisabled={previewCompiling}
                     type="button"
                   >
