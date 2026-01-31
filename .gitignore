@@ -8,6 +8,7 @@ __pycache__/
 # Virtual environments
 backend/.venv/
 backend/.data/
+backend/backend/.data/
 
 # Pytest cache
 .pytest_cache/
@@ -35,6 +36,10 @@ frontend/node_modules/
 frontend/dist/
 frontend/build/
 
+# Verta models
+backend/.models/
+backend/backend/.models/
+
 # Vite / bundler artifacts
 frontend/.vite/
 frontend/.cache/
@@ -44,4 +49,3 @@ frontend/coverage/
 
 # Dependency directories
 backend/.pip-wheel-metadata/
-

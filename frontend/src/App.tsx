@@ -1158,6 +1158,8 @@ export default function App() {
       setPdfPageCount(null);
       setPageHistory([1]);
       setPageHistoryIndex(0);
+    } catch (err) {
+      notify(err instanceof Error ? err.message : "Compile failed");
     } finally {
       setPreviewCompiling(false);
     }
@@ -1395,11 +1397,17 @@ export default function App() {
                   onPress={async () => {
                     if (sharedPreviewUrl) URL.revokeObjectURL(sharedPreviewUrl);
                     setSharedCompiling(true);
-                    const blob = await compileLatex(publicDoc.content);
-                    setSharedPreviewUrl(URL.createObjectURL(blob));
-                    setSharedCompiling(false);
+                    try {
+                      const blob = await compileLatex(publicDoc.content);
+                      setSharedPreviewUrl(URL.createObjectURL(blob));
+                    } catch (err) {
+                      notify(err instanceof Error ? err.message : "Compile failed");
+                    } finally {
+                      setSharedCompiling(false);
+                    }
                   }}
                   isDisabled={sharedCompiling}
+                  type="button"
                 >
                   <span className={sharedCompiling ? "iconOnly spin" : "iconOnly"} aria-hidden="true">
                     <IconRefresh />
@@ -2043,6 +2051,7 @@ export default function App() {
                     className="toolbarButton"
                     onPress={onCompilePreview}
                     isDisabled={previewCompiling}
+                    type="button"
                   >
                     <span className={previewCompiling ? "iconOnly spin" : "iconOnly"} aria-hidden="true">
                       <IconRefresh />
