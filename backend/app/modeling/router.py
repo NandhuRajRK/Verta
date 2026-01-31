@@ -1,21 +1,25 @@
 import asyncio
 
-from app.modeling.backends import ModelBackend
+from app.modeling.backends import ApiEchoBackend, LocalEchoBackend, ModelBackend
 from app.modeling.models import CompletionRequest, CompletionResponse
 
 
 class ModelRouter:
     def __init__(
         self,
+        local_echo_backend: ModelBackend,
         local_ollama_backend: ModelBackend,
         local_llamacpp_backend: ModelBackend,
-        openai_backend: ModelBackend,
-        hf_backend: ModelBackend,
+        api_echo_backend: ModelBackend | None = None,
+        openai_backend: ModelBackend | None = None,
+        hf_backend: ModelBackend | None = None,
     ):
+        self._local_echo_backend = local_echo_backend
         self._local_ollama_backend = local_ollama_backend
         self._local_llamacpp_backend = local_llamacpp_backend
-        self._openai_backend = openai_backend
-        self._hf_backend = hf_backend
+        self._api_echo_backend = api_echo_backend or ApiEchoBackend()
+        self._openai_backend = openai_backend or ApiEchoBackend(provider="openai")
+        self._hf_backend = hf_backend or ApiEchoBackend(provider="hf")
 
     async def completion(self, req: CompletionRequest) -> CompletionResponse:
         backend = self._select_backend(req)
@@ -29,16 +33,20 @@ class ModelRouter:
     def _select_backend(self, req: CompletionRequest) -> ModelBackend:
         if req.modelConfig.type == "local":
             provider = (req.modelConfig.provider or "").lower()
+            if provider in ("", "echo"):
+                return self._local_echo_backend
             if provider in ("ollama",):
                 return self._local_ollama_backend
             if provider in ("llamacpp", "llama.cpp", "llama-cpp"):
                 return self._local_llamacpp_backend
-            raise ValueError("Local modelConfig.provider must be 'ollama' or 'llamacpp'")
+            raise ValueError("Local modelConfig.provider must be 'echo', 'ollama' or 'llamacpp'")
         if req.modelConfig.type == "api":
             provider = (req.modelConfig.provider or "").lower()
+            if provider == "echo":
+                return self._api_echo_backend
             if provider in ("openai", "oai"):
                 return self._openai_backend
             if provider in ("hf", "huggingface", "hugging-face"):
                 return self._hf_backend
-            raise ValueError("API modelConfig.provider must be 'openai' or 'hf'")
+            raise ValueError("API modelConfig.provider must be 'openai', 'hf', or 'echo'")
         raise ValueError("Unsupported model type")

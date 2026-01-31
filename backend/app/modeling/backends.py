@@ -10,6 +10,32 @@ class ModelBackend(ABC):
     async def completion(self, req: CompletionRequest) -> CompletionResponse: ...
 
 
+class LocalEchoBackend(ModelBackend):
+    """
+    Deterministic echo backend for local provider='echo'. Used in tests and as a safe fallback.
+    """
+
+    def __init__(self, runtime: str = "echo"):
+        self.runtime = runtime
+
+    async def completion(self, req: CompletionRequest) -> CompletionResponse:
+        text = f"[local:{self.runtime}] {req.context or ''} {req.prompt or ''}".strip()
+        return CompletionResponse(text=text, metadata={"backend": "local", "provider": "echo"})
+
+
+class ApiEchoBackend(ModelBackend):
+    """
+    Deterministic echo backend for api provider='echo'. Useful for tests/offline.
+    """
+
+    def __init__(self, provider: str = "echo"):
+        self.provider = provider
+
+    async def completion(self, req: CompletionRequest) -> CompletionResponse:
+        text = f"[api:{self.provider}] {req.context or ''} {req.prompt or ''}".strip()
+        return CompletionResponse(text=text, metadata={"backend": "api", "provider": self.provider})
+
+
 class SlowBackend(ModelBackend):
     def __init__(self, delay_s: float):
         self._delay_s = delay_s
