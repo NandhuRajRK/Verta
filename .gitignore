@@ -1,0 +1,47 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+backend/.venv/
+backend/.data/
+
+# Pytest cache
+.pytest_cache/
+
+# Logs
+*.log
+
+# IDE/editor
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Frontend artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Vite / bundler artifacts
+frontend/.vite/
+frontend/.cache/
+
+# Optional frontend coverage
+frontend/coverage/
+
+# Dependency directories
+backend/.pip-wheel-metadata/
+
