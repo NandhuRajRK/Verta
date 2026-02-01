@@ -21,7 +21,38 @@ This repository implements the backend/frontend scaffolding for a Prism-like AI-
 3. **Tests (`tests/`)**  
    - Pytest suites covering context extraction, completion routing, latex APIs, Zotero, local models, model registry, Mathpix/Tesseract logic, error handling, etc.
 
-## Getting Started
+## Quick Start with Docker (Recommended)
+
+Docker solves the LaTeX compiler setup issue - tectonic is pre-installed in the container.
+
+### Prerequisites
+- Docker and Docker Compose installed
+
+### Run the full stack
+
+```bash
+docker-compose up -d
+```
+
+Access the app at `http://localhost:3000`. The backend API is at `http://localhost:8000`.
+
+### Stop
+
+```bash
+docker-compose down
+```
+
+### Data persistence
+
+Documents and data are stored in a Docker volume `verta_data`. To reset:
+
+```bash
+docker-compose down -v
+```
+
+---
+
+## Manual Setup (Alternative)
 
 ### Prerequisites
 

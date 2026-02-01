@@ -238,8 +238,7 @@ body,
 .layout {
   flex: 1;
   display: grid;
-  grid-template-columns:
-    minmax(0, var(--editor-col, 1.6fr)) 6px minmax(0, var(--assistant-col, 1fr)) 6px minmax(0, var(--right-col, 1.1fr));
+  grid-template-columns: var(--editor-col, 1.6fr) 6px var(--assistant-col, 1fr) 6px var(--right-col, 1.1fr);
   grid-template-rows: 1fr;
   row-gap: 0;
   column-gap: 0;
@@ -392,6 +391,33 @@ body,
   flex-direction: column;
   gap: 6px;
   overflow: auto;
+}
+
+.chatList {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+
+.chatItem {
+  text-align: left;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  min-height: 38px;
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chatItem.active {
+  background: rgba(102, 186, 255, 0.15);
+  border-color: rgba(102, 186, 255, 0.25);
 }
 
 .folderBlock {
@@ -808,6 +834,8 @@ button:disabled {
 
 .toolsPaneContent {
   padding: 12px;
+  overflow: auto;
+  flex: 1;
 }
 
 .proposedHeader {
@@ -1068,3 +1096,462 @@ button:disabled {
     display: none;
   }
 }
+.bubble.typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  opacity: 0.7;
+}
+
+.typingDot {
+  animation: typingBounce 1.4s ease-in-out infinite both;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.typingDot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typingDot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typingBounce {
+  0%, 80%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+.connectionErrorBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(220, 38, 38, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 13px;
+  color: white;
+}
+
+.connectionErrorBanner button {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.connectionErrorBanner button:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.shortcutRow:last-child {
+  border-bottom: 0;
+}
+
+.shortcut {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  white-space: nowrap;
+}
+/* PDF Compile Loading State */
+.previewLoading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(10, 12, 16, 0.95);
+  z-index: 10;
+}
+
+.previewLoadingSpinner {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.previewLoadingSpinner .spin {
+  animation: spin 1s linear infinite;
+}
+
+.previewLoadingText {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.progressBar {
+  width: 200px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, rgba(102, 186, 255, 0.8), rgba(124, 156, 255, 0.9));
+  border-radius: 2px;
+  animation: progressPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes progressPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Enhanced Empty States */
+.previewPlaceholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #0b0c10;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  margin: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.previewPlaceholderIcon {
+  font-size: 32px;
+  opacity: 0.6;
+}
+
+.previewPlaceholderTitle {
+  font-size: 15px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.previewPlaceholderText {
+  font-size: 13px;
+  opacity: 0.6;
+  max-width: 220px;
+  line-height: 1.4;
+}
+
+.previewPlaceholderButton {
+  margin-top: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(102, 186, 255, 0.15);
+  border: 1px solid rgba(102, 186, 255, 0.25);
+  color: inherit;
+  cursor: pointer;
+}
+
+.previewPlaceholderButton:hover {
+  background: rgba(102, 186, 255, 0.25);
+}
+
+/* Empty Workspace State */
+.emptyWorkspace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.emptyWorkspaceIcon {
+  font-size: 40px;
+  opacity: 0.5;
+}
+
+.emptyWorkspaceTitle {
+  font-size: 16px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.emptyWorkspaceText {
+  font-size: 13px;
+  opacity: 0.6;
+  max-width: 240px;
+  line-height: 1.4;
+}
+
+.emptyWorkspaceButton {
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(102, 186, 255, 0.15);
+  border: 1px solid rgba(102, 186, 255, 0.25);
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.emptyWorkspaceButton:hover {
+  background: rgba(102, 186, 255, 0.25);
+}
+
+/* No Models State */
+.noModelsState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.noModelsText {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.noModelsLink {
+  font-size: 12px;
+  color: rgba(102, 186, 255, 0.9);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Empty State for Comments/Logs */
+.emptyState {
+  padding: 20px;
+  text-align: center;
+}
+
+.emptyStateText {
+  font-size: 14px;
+  opacity: 0.8;
+  margin-bottom: 8px;
+}
+
+.emptyStateHint {
+  font-size: 12px;
+  opacity: 0.5;
+  max-width: 280px;
+  line-height: 1.4;
+}
+
+/* Welcome Screen */
+.welcomeScreen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0a0c10 0%, #14181f 100%);
+  z-index: 50;
+}
+
+.welcomeContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px;
+  max-width: 480px;
+}
+
+.welcomeIcon {
+  font-size: 64px;
+  margin-bottom: 24px;
+}
+
+.welcomeTitle {
+  font-size: 32px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.8) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.welcomeSubtitle {
+  font-size: 16px;
+  opacity: 0.6;
+  margin: 0 0 32px 0;
+}
+
+.welcomeActions {
+  margin-bottom: 40px;
+}
+
+.welcomePrimaryButton {
+  padding: 14px 32px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(102, 186, 255, 0.2) 0%, rgba(124, 156, 255, 0.2) 100%);
+  border: 1px solid rgba(102, 186, 255, 0.4);
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.welcomePrimaryButton:hover {
+  background: linear-gradient(135deg, rgba(102, 186, 255, 0.3) 0%, rgba(124, 156, 255, 0.3) 100%);
+  transform: translateY(-1px);
+}
+
+/* Recent Projects - Grid Layout */
+.recentProjects {
+  width: 100%;
+  max-width: 600px;
+  text-align: center;
+}
+
+.recentProjectsTitle {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.6;
+  margin: 0 0 16px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.recentProjectsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.recentProjectCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.recentProjectCard:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(102, 186, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.recentProjectIcon {
+  font-size: 28px;
+  opacity: 0.8;
+}
+
+.recentProjectName {
+  font-size: 13px;
+  font-weight: 500;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentProjectDate {
+  font-size: 11px;
+  opacity: 0.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Presence Indicator with Tooltip */
+.presenceIndicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.presenceDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+.presenceTooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  margin-bottom: 8px;
+  z-index: 100;
+}
+
+.presenceIndicator:hover .presenceTooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Cursor Sync Indicator */
+.cursorSyncIndicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.cursorSyncDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3b82f6;
+  animation: blink 1.5s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+

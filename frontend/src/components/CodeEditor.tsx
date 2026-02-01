@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef } from "react";
+import { Suspense, lazy, useMemo } from "react";
 
 type Props = {
   value: string;
@@ -10,8 +10,6 @@ type Props = {
   stickyScroll?: boolean;
   vimMode?: boolean;
   formatOnType?: boolean;
-  diffOriginal?: string | null;
-  diffModified?: string | null;
 };
 
 const Monaco = lazy(() => import("@monaco-editor/react"));
@@ -63,49 +61,34 @@ export function CodeEditor({
   stickyScroll = true,
   vimMode = false,
   formatOnType = true,
-  diffOriginal = null,
-  diffModified = null,
 }: Props) {
   const useTextarea = isTestEnv();
-  const showDiff = diffOriginal != null && diffModified != null && !useTextarea;
-  const diffEditorRef = useRef<any>(null);
   const options = useMemo(
-    () => ({
-      automaticLayout: true,
-      minimap: { enabled: true },
-      fontSize: 13,
-      lineNumbers: "on",
-      wordWrap,
-      scrollBeyondLastLine: true,
-      bracketPairColorization: { enabled: true },
-      formatOnType,
-      formatOnPaste: formatOnType,
-      suggestOnTriggerCharacters: true,
-      quickSuggestions: { other: true, comments: true, strings: true },
-      parameterHints: { enabled: true },
-      hover: { enabled: true },
-      links: true,
-      folding: true,
-      stickyScroll: { enabled: stickyScroll },
-      renderWhitespace: "boundary",
-      renderControlCharacters: true,
-      smoothScrolling: true,
-      cursorSmoothCaretAnimation: "on",
-    }),
+    () =>
+      ({
+        automaticLayout: true,
+        minimap: { enabled: true },
+        fontSize: 13,
+        lineNumbers: "on" as const,
+        wordWrap,
+        scrollBeyondLastLine: true,
+        bracketPairColorization: { enabled: true },
+        formatOnType,
+        formatOnPaste: formatOnType,
+        suggestOnTriggerCharacters: true,
+        quickSuggestions: { other: true, comments: true, strings: true },
+        parameterHints: { enabled: true },
+        hover: { enabled: true },
+        links: true,
+        folding: true,
+        stickyScroll: { enabled: stickyScroll },
+        renderWhitespace: "boundary" as const,
+        renderControlCharacters: true,
+        smoothScrolling: true,
+        cursorSmoothCaretAnimation: "on" as const,
+      }) as const,
     [formatOnType, stickyScroll, wordWrap],
   );
-
-  useEffect(() => {
-    if (!showDiff || !diffEditorRef.current) return;
-    const editor = diffEditorRef.current;
-    const changes = editor.getLineChanges?.() ?? [];
-    const first = changes?.[0];
-    const line = Math.max(1, first?.modifiedStartLineNumber || first?.originalStartLineNumber || 1);
-    const modified = editor.getModifiedEditor?.();
-    if (modified?.revealLineInCenter) {
-      modified.revealLineInCenter(line);
-    }
-  }, [showDiff, diffModified]);
 
   if (useTextarea) {
     return (
@@ -125,55 +108,41 @@ export function CodeEditor({
   return (
     <div className="monacoWrap" aria-label={ariaLabel}>
       <Suspense fallback={<div className="muted" style={{ padding: 12 }}>Loading editor...</div>}>
-        {showDiff ? (
-          <Monaco.DiffEditor
-            height="100%"
-            theme="vs-dark"
-            language={language}
-            original={diffOriginal ?? ""}
-            modified={diffModified ?? ""}
-            options={{ ...options, renderSideBySide: false, readOnly: true }}
-            beforeMount={(monaco) => {
-              defineTheme(monaco);
-            }}
-            onMount={(editor, monaco) => {
-              monaco.editor.setTheme("verta-dark");
-              diffEditorRef.current = editor;
-            }}
-          />
-        ) : (
-          <Monaco
-            height="100%"
-            theme="vs-dark"
-            language={language}
-            value={value}
-            options={options}
-            beforeMount={(monaco) => {
-              defineTheme(monaco);
-            }}
-            onMount={(editor, monaco) => {
-              monaco.editor.setTheme("verta-dark");
-              const model = editor.getModel();
-              editor.onDidChangeCursorSelection((e) => {
-                if (!onSelectionChange || !model) return;
-                const start = model.getOffsetAt(e.selection.getStartPosition());
-                const end = model.getOffsetAt(e.selection.getEndPosition());
-                onSelectionChange(start, end);
-              });
-              if (vimMode) {
-                void (async () => {
-                  try {
-                    const modPath = "monaco-vim";
-                    const mod = await import(/* @vite-ignore */ modPath);
-                    const initVimMode = (mod as any).initVimMode as (ed: any, el: HTMLElement) => { dispose: () => void };
-                    initVimMode(editor, editor.getDomNode() as HTMLElement);
-                  } catch {}
-                })();
-              }
-            }}
-            onChange={(v) => onChange(v ?? "")}
-          />
-        )}
+        <Monaco
+          height="100%"
+          theme="vs-dark"
+          language={language}
+          value={value}
+          options={options}
+          beforeMount={(monaco: unknown) => {
+            defineTheme(monaco);
+          }}
+          onMount={(editor: unknown, monaco: unknown) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (monaco as any).editor.setTheme("verta-dark");
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const model = (editor as any).getModel?.();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (editor as any).onDidChangeCursorSelection?.((e: any) => {
+              if (!onSelectionChange || !model) return;
+              const start = model.getOffsetAt(e.selection.getStartPosition());
+              const end = model.getOffsetAt(e.selection.getEndPosition());
+              onSelectionChange(start, end);
+            });
+            if (vimMode) {
+              void (async () => {
+                try {
+                  const modPath = "monaco-vim";
+                  const mod = await import(/* @vite-ignore */ modPath);
+                  const initVimMode = (mod as any).initVimMode as (ed: any, el: HTMLElement) => { dispose: () => void };
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  initVimMode(editor as any, (editor as any).getDomNode?.() as HTMLElement);
+                } catch {}
+              })();
+            }
+          }}
+          onChange={(v) => onChange(v ?? "")}
+        />
       </Suspense>
     </div>
   );

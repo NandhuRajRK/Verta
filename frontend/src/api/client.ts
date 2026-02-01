@@ -91,7 +91,7 @@ export async function shareDoc(id: string): Promise<ShareResponse> {
 }
 
 export async function getSharedDoc(token: string): Promise<SharedDocResponse> {
-  const res = await fetch(`${API_BASE}/share/${encodeURIComponent(token)}`);
+  const res = await fetch(`/share/${encodeURIComponent(token)}`);
   return json<SharedDocResponse>(res);
 }
 

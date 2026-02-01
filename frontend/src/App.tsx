@@ -1,6 +1,6 @@
 import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-import "./app.css";
+import "./App.css";
 import {
   compileLatex,
   completion,
@@ -39,7 +39,7 @@ import type { ModelConfig } from "./api/types";
 import { CodeEditor } from "./components/CodeEditor";
 import { Button, Dialog, Heading, IconButton, Menu, MenuItem, MenuTrigger, Modal, ModalOverlay, Popover, Tab, TabList, Tabs, TextField, Input } from "./components/Aria";
 
-const DEFAULT_MODEL: ModelConfig = { type: "local", provider: "ollama", id: "llama3", settings: {} };
+// const DEFAULT_MODEL: ModelConfig = { type: "local", provider: "ollama", id: "llama3", settings: {} };
 
 function SvgIcon({
   children,
@@ -333,6 +333,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<string[] | null>(null);
   const [projectMenuDocs, setProjectMenuDocs] = useState<{ id: string; title?: string | null }[]>([]);
+  const [recentDocs, setRecentDocs] = useState<{ id: string; title?: string | null }[]>([]);
   const [comments, setComments] = useState<{ id: string; doc_id: string; body: string; created_at: string; path?: string | null; selection_start?: number | null; selection_end?: number | null }[]>([]);
   const [logs, setLogs] = useState<{ id: string; doc_id: string; body: string; created_at: string }[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
@@ -403,6 +404,7 @@ export default function App() {
   const [ollamaStatus, setOllamaStatus] = useState<string | null>(null);
   const [ollamaUrl, setOllamaUrl] = useState("");
   const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+  const [latexCompilerPath, setLatexCompilerPath] = useState("");
   const [editorSettings, setEditorSettings] = useState({
     autoFormatting: true,
     realtimeCompile: true,
@@ -422,6 +424,9 @@ export default function App() {
   const [rightPaneMode, setRightPaneMode] = useState<"preview" | "tools">("preview");
   const [toolsTab, setToolsTab] = useState<"project" | "comments" | "logs">("project");
   const [previewCompiling, setPreviewCompiling] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const splitterPx = 6;
   const minSidebarPx = 240;
@@ -555,6 +560,17 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("pdfSettings", JSON.stringify(pdfSettings));
   }, [pdfSettings]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("latexCompilerPath");
+    if (saved) {
+      setLatexCompilerPath(saved);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("latexCompilerPath", latexCompilerPath);
+  }, [latexCompilerPath]);
 
   const [workspace, setWorkspace] = useState<Workspace>(() => emptyWorkspace());
 
@@ -798,29 +814,8 @@ export default function App() {
     void (async () => {
       try {
         const docs = await listDocs();
-        if (!docs.length) return;
-        const first = docs[0];
-        const loaded = await getDoc(first.id);
-        const ws = tryParseWorkspace(loaded.content);
-        if (ws) {
-          setWorkspace(ws);
-          setDocId(first.id);
-        }
-        try {
-          const env = await getDocModels(first.id);
-          setModels(env.models.length ? env.models : []);
-          setSelectedModelId(env.models[0]?.id ?? "");
-        } catch {}
-        const settings = loaded.settings ?? {};
-        if (settings.editorSettings && typeof settings.editorSettings === "object") {
-          setEditorSettings((prev) => ({ ...prev, ...(settings.editorSettings as object) }));
-        }
-        if (settings.pdfSettings && typeof settings.pdfSettings === "object") {
-          setPdfSettings((prev) => ({ ...prev, ...(settings.pdfSettings as object) }));
-        }
-        if (typeof (settings as any).webSearchEnabled === "boolean") {
-          setWebSearchEnabled(Boolean((settings as any).webSearchEnabled));
-        }
+        setRecentDocs(docs);
+        // Don't auto-load first doc - show Recent Projects instead
       } catch {}
     })();
   }, []);
@@ -995,12 +990,62 @@ export default function App() {
   }
 
   async function onCreateDoc(): Promise<string> {
+    // Scaffold a working LaTeX repo
+    const scaffoldedWorkspace: Workspace = {
+      active: "main.tex",
+      entries: {
+        "main.tex": fileEntry(`\\documentclass[12pt,a4paper]{article}
+
+\\usepackage[utf8]{inputenc}
+\\usepackage[T1]{fontenc}
+\\usepackage{amsmath,amssymb}
+\\usepackage{graphicx}
+\\usepackage{hyperref}
+
+\\title{My Document}
+\\author{Author Name}
+\\date{\\today}
+
+\\begin{document}
+
+\\maketitle
+
+\\input{chapters/introduction}
+
+\\bibliography{references}
+\\bibliographystyle{plain}
+
+\\end{document}`),
+        "chapters/": folderEntry(),
+        "chapters/introduction.tex": fileEntry(`\\section{Introduction}
+
+This is the introduction to your document.
+
+\\subsection{Background}
+
+Add your background information here.
+
+\\subsection{Objectives}
+
+State your objectives here.`),
+        "references.bib": fileEntry(`@article{example2024,
+  author  = {John Doe and Jane Smith},
+  title   = {An Example Article},
+  journal = {Journal of Examples},
+  year    = {2024},
+  volume  = {1},
+  pages   = {1--10}
+}`),
+      },
+    };
+    
     const created = await createDoc({
       title: "workspace",
-      content: serializeWorkspace(workspace),
+      content: serializeWorkspace(scaffoldedWorkspace),
       settings: { editorSettings, pdfSettings, webSearchEnabled },
     });
     setDocId(created.id);
+    setWorkspace(scaffoldedWorkspace);
     const env = await getDocModels(created.id);
     setModels(env.models.length ? env.models : []);
     setSelectedModelId(env.models[0]?.id ?? "");
@@ -1024,6 +1069,8 @@ export default function App() {
   async function onSaveDoc() {
     await saveWorkspace(workspace);
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  void onSaveDoc;
 
   async function onLoadDoc() {
     const id = await ensureDocId();
@@ -1041,6 +1088,8 @@ export default function App() {
       setWebSearchEnabled(Boolean((settings as any).webSearchEnabled));
     }
   }
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  void onLoadDoc;
 
   async function onSuggest() {
     if (!activeFile) return;
@@ -1084,49 +1133,66 @@ export default function App() {
       .filter(Boolean)
       .join("\n");
 
-    const resp = await completion({
-      modelConfig: model,
-      sourceLatex: activeFile.content,
-      prompt: `${systemPrompt}\n\nUSER:\n${prompt}`,
-      options: { maxTokens: 4096, timeoutS: 120.0 },
-    });
-    const parsed = parseStructuredPatch(resp.text);
-    const assistantText = parsed?.message ?? (parsed?.file ? `Proposed changes ready for ${parsed.file}.` : "");
-    const assistantMsg = {
-      id: crypto.randomUUID(),
-      role: "assistant" as const,
-      text: assistantText || "Model response could not be parsed into a patch.",
-    };
-    updateThread(activeThreadId, (t) => ({ ...t, messages: [...t.messages, assistantMsg], lastSuggestion: assistantText }));
-    if (!parsed) {
+    setIsTyping(true);
+    setConnectionError(null);
+    try {
+      const resp = await completion({
+        modelConfig: model,
+        sourceLatex: activeFile.content,
+        prompt: `${systemPrompt}\n\nUSER:\n${prompt}`,
+        options: { maxTokens: 4096, timeoutS: 120.0 },
+      });
+      const parsed = parseStructuredPatch(resp.text);
+      const assistantText = parsed?.message ?? (parsed?.file ? `Proposed changes ready for ${parsed.file}.` : "");
+      const assistantMsg = {
+        id: crypto.randomUUID(),
+        role: "assistant" as const,
+        text: assistantText || "Model response could not be parsed into a patch.",
+      };
+      updateThread(activeThreadId, (t) => ({ ...t, messages: [...t.messages, assistantMsg], lastSuggestion: assistantText }));
+      if (!parsed) {
+        updateThread(activeThreadId, (t) => ({
+          ...t,
+          proposed: [],
+          proposedFile: null,
+          proposedPatch: null,
+          proposedText: "Model did not return a valid patch.",
+        }));
+        return;
+      }
+      const target = parsed.file;
+      const entry = workspace.entries[target];
+      const baseContent = entry && entry.type === "file" ? entry.content : "";
+      const isNewFile = !entry || entry.type !== "file";
+      const result = applyUnifiedDiff(baseContent, parsed.patch);
       updateThread(activeThreadId, (t) => ({
         ...t,
-        proposed: [],
-        proposedFile: null,
-        proposedPatch: null,
-        proposedText: "Model did not return a valid patch.",
+        proposedFile: target,
+        proposedPatch: parsed.patch,
+        proposedText: parsed.message ?? (isNewFile ? "Create new file." : ""),
+        proposed: [
+          {
+            file: target,
+            note: parsed.message ?? (prompt.slice(0, 40) || "Edit"),
+            added: result.added,
+            removed: result.removed,
+          },
+        ],
       }));
-      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Request failed";
+      setConnectionError(msg);
+      notify(msg);
+      // Add error message to chat with retry option
+      const errorMsg = {
+        id: crypto.randomUUID(),
+        role: "assistant" as const,
+        text: `Error: ${msg}. Tap to retry.`,
+      };
+      updateThread(activeThreadId, (t) => ({ ...t, messages: [...t.messages, errorMsg] }));
+    } finally {
+      setIsTyping(false);
     }
-    const target = parsed.file;
-    const entry = workspace.entries[target];
-    const baseContent = entry && entry.type === "file" ? entry.content : "";
-    const isNewFile = !entry || entry.type !== "file";
-    const result = applyUnifiedDiff(baseContent, parsed.patch);
-    updateThread(activeThreadId, (t) => ({
-      ...t,
-      proposedFile: target,
-      proposedPatch: parsed.patch,
-      proposedText: parsed.message ?? (isNewFile ? "Create new file." : ""),
-      proposed: [
-        {
-          file: target,
-          note: parsed.message ?? (prompt.slice(0, 40) || "Edit"),
-          added: result.added,
-          removed: result.removed,
-        },
-      ],
-    }));
   }
 
   async function onExtractLatexFromImage(file: File) {
@@ -1312,7 +1378,7 @@ export default function App() {
         };
     setWorkspace(next);
     await saveWorkspace(next);
-    await addLog(await ensureDocId(), `Created ${newEntryKind === "folder" ? "folder" : "file"} ${name}`);
+    await addLog(await ensureDocId(), `Created file ${name}`);
     await addLog(await ensureDocId(), "Uploaded files");
     setIsNewFileOpen(false);
     setNewFileName("");
@@ -1466,6 +1532,61 @@ export default function App() {
         // @ts-expect-error webkitdirectory support
         webkitdirectory="true"
       />
+      {connectionError && (
+        <div className="connectionErrorBanner">
+          <span>⚠️ {connectionError}</span>
+          <Button onPress={() => setConnectionError(null)}>Dismiss</Button>
+        </div>
+      )}
+      
+      {/* Recent Projects Welcome Screen */}
+      {!docId && (
+        <div className="welcomeScreen">
+          <div className="welcomeContent">
+            <div className="welcomeIcon">📚</div>
+            <h1 className="welcomeTitle">Welcome to Verta</h1>
+            <p className="welcomeSubtitle">LaTeX editing with AI assistance</p>
+            
+            <div className="welcomeActions">
+              <Button 
+                onPress={async () => {
+                  await onCreateDoc();
+                  setSidebarStatus(`Created new project`);
+                  setTimeout(() => setSidebarStatus(null), 2000);
+                }}
+                className="welcomePrimaryButton"
+              >
+                Create New Project
+              </Button>
+            </div>
+
+            {recentDocs.length > 0 && (
+              <div className="recentProjects">
+                <h2 className="recentProjectsTitle">Recent</h2>
+                <div className="recentProjectsGrid">
+                  {recentDocs.slice(0, 6).map((doc) => (
+                    <button
+                      key={doc.id}
+                      className="recentProjectCard"
+                      onClick={async () => {
+                        const loaded = await getDoc(doc.id);
+                        const ws = tryParseWorkspace(loaded.content);
+                        if (ws) setWorkspace(ws);
+                        setDocId(doc.id);
+                      }}
+                    >
+                      <span className="recentProjectIcon">📄</span>
+                      <span className="recentProjectName">{doc.title || `Project ${doc.id.slice(0, 6)}`}</span>
+                      <span className="recentProjectDate">{doc.id.slice(0, 8)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div
         className={sidebarCollapsed ? "appFrame sidebarCollapsed" : "appFrame"}
         ref={frameRef}
@@ -1486,6 +1607,9 @@ export default function App() {
                 <div className="sidebarIconSpacer" />
                 <IconButton aria-label="Settings" onPress={() => setSettingsOpen(true)}>
                   <IconSettings />
+                </IconButton>
+                <IconButton aria-label="Keyboard shortcuts" onPress={() => setShortcutsOpen(true)}>
+                  <span>⌨</span>
                 </IconButton>
               <MenuTrigger>
                 <IconButton aria-label="View toggles">
@@ -1635,92 +1759,103 @@ export default function App() {
             <nav className="sidebarBody" aria-label="Files">
               {activeSidebarTab === "files" ? (
                 <div className="fileList">
-                  {listRootFolders().map((folder) => {
-                    const open = !!expandedFolders[folder];
-                    const children = listFolderChildren(folder);
-                    return (
-                      <div key={folder} className="folderBlock">
-                        <div className="folderRow">
-                          <Button
-                            className="folderToggle"
-                            aria-label={open ? `Collapse ${folder}` : `Expand ${folder}`}
-                            onPress={() => toggleFolder(folder)}
-                          >
-                            {open ? "▾" : "▸"}
-                          </Button>
-                          <Button
-                            className="folderName"
-                            onPress={() => toggleFolder(folder)}
-                            aria-label={`Folder ${folder}`}
-                          >
-                            <span className="folderIcon">
-                              <IconFolder />
-                            </span>
-                            {folder}
-                          </Button>
-                          <MenuTrigger>
-                            <Button className="folderPlus" aria-label={`Folder actions ${folder}`}>
-                              <IconPlus />
-                            </Button>
-                            <Popover className="popover">
-                              <Menu aria-label={`Actions for ${folder}`} className="menu">
-                                <MenuItem onAction={() => openNewEntryModal(`${folder}/`, "file")}>Add file</MenuItem>
-                                <MenuItem onAction={() => openNewEntryModal(`${folder}/`, "folder")}>Add folder</MenuItem>
-                                <MenuItem
-                                  onAction={() => {
-                                    uploadBaseRef.current = `${folder}/`;
-                                    uploadFileInputRef.current?.click();
-                                  }}
-                                >
-                                  Upload file
-                                </MenuItem>
-                                <MenuItem
-                                  onAction={() => {
-                                    uploadBaseRef.current = `${folder}/`;
-                                    uploadDirInputRef.current?.click();
-                                  }}
-                                >
-                                  Upload directory
-                                </MenuItem>
-                                <MenuItem
-                                  onAction={async () => {
-                                    const resp = await connectZotero();
-                                    setSidebarStatus(`Zotero ${resp.status}`);
-                                    setTimeout(() => setSidebarStatus(null), 2000);
-                                  }}
-                                >
-                                  Connect Zotero
-                                </MenuItem>
-                              </Menu>
-                            </Popover>
-                          </MenuTrigger>
-                        </div>
-                        {open ? (
-                          <div className="folderChildren">
-                            {children.map((path) => (
+                  {listRootFolders().length === 0 && listRootFiles().length === 0 ? (
+                    <div className="emptyWorkspace">
+                      <div className="emptyWorkspaceIcon">📁</div>
+                      <div className="emptyWorkspaceTitle">No files yet</div>
+                      <div className="emptyWorkspaceText">Create your first file to get started with your project.</div>
+                      <Button onPress={() => setIsNewFileOpen(true)} className="emptyWorkspaceButton">Create First File</Button>
+                    </div>
+                  ) : (
+                    <>
+                      {listRootFolders().map((folder) => {
+                        const open = !!expandedFolders[folder];
+                        const children = listFolderChildren(folder);
+                        return (
+                          <div key={folder} className="folderBlock">
+                            <div className="folderRow">
                               <Button
-                                key={path}
-                                className={path === workspace.active ? "fileItem active" : "fileItem"}
-                                onPress={() => setActive(path)}
+                                className="folderToggle"
+                                aria-label={open ? `Collapse ${folder}` : `Expand ${folder}`}
+                                onPress={() => toggleFolder(folder)}
                               >
-                                {path.split("/").slice(1).join("/")}
+                                {open ? "▾" : "▸"}
                               </Button>
-                            ))}
+                              <Button
+                                className="folderName"
+                                onPress={() => toggleFolder(folder)}
+                                aria-label={`Folder ${folder}`}
+                              >
+                                <span className="folderIcon">
+                                  <IconFolder />
+                                </span>
+                                {folder}
+                              </Button>
+                              <MenuTrigger>
+                                <Button className="folderPlus" aria-label={`Folder actions ${folder}`}>
+                                  <IconPlus />
+                                </Button>
+                                <Popover className="popover">
+                                  <Menu aria-label={`Actions for ${folder}`} className="menu">
+                                    <MenuItem onAction={() => openNewEntryModal(`${folder}/`, "file")}>Add file</MenuItem>
+                                    <MenuItem onAction={() => openNewEntryModal(`${folder}/`, "folder")}>Add folder</MenuItem>
+                                    <MenuItem
+                                      onAction={() => {
+                                        uploadBaseRef.current = `${folder}/`;
+                                        uploadFileInputRef.current?.click();
+                                      }}
+                                    >
+                                      Upload file
+                                    </MenuItem>
+                                    <MenuItem
+                                      onAction={() => {
+                                        uploadBaseRef.current = `${folder}/`;
+                                        uploadDirInputRef.current?.click();
+                                      }}
+                                    >
+                                      Upload directory
+                                    </MenuItem>
+                                    <MenuItem
+                                      onAction={async () => {
+                                        const resp = await connectZotero();
+                                        setSidebarStatus(`Zotero ${resp.status}`);
+                                        setTimeout(() => setSidebarStatus(null), 2000);
+                                      }}
+                                    >
+                                      Connect Zotero
+                                    </MenuItem>
+                                  </Menu>
+                                </Popover>
+                              </MenuTrigger>
+                            </div>
+                            {open ? (
+                              <div className="folderChildren">
+                                {children.map((path) => (
+                                  <Button
+                                    key={path}
+                                    className={path === workspace.active ? "fileItem active" : "fileItem"}
+                                    onPress={() => setActive(path)}
+                                  >
+                                    {path.split("/").slice(1).join("/")}
+                                  </Button>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
 
-                  {listRootFiles().map((name) => (
-                    <Button
-                      key={name}
-                      className={name === workspace.active ? "fileItem active" : "fileItem"}
-                      onPress={() => setActive(name)}
-                    >
-                      {name}
-                    </Button>
-                  ))}
+                      {listRootFiles().map((name) => (
+                        <Button
+                          key={name}
+                          className={name === workspace.active ? "fileItem active" : "fileItem"}
+                          onPress={() => setActive(name)}
+                        >
+                          {name}
+                        </Button>
+                      ))}
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="muted" style={{ padding: 12 }}>
@@ -1802,16 +1937,6 @@ export default function App() {
               stickyScroll={!editorSettings.disableStickyScroll}
               vimMode={editorSettings.vimMode}
               formatOnType={editorSettings.autoFormatting}
-              diffOriginal={
-                activeThread.proposedFile === activeFile?.name && activeThread.proposedPatch
-                  ? activeFile?.content ?? ""
-                  : null
-              }
-              diffModified={
-                activeThread.proposedFile === activeFile?.name && activeThread.proposedPatch
-                  ? applyUnifiedDiff(activeFile?.content ?? "", activeThread.proposedPatch).text
-                  : null
-              }
             />
           </section>
           ) : null}
@@ -1844,7 +1969,7 @@ export default function App() {
                     ))
                   ) : (
                     <option value="" disabled>
-                      No models configured
+                      No models configured — Open Settings → Integrations
                     </option>
                   )}
                 </select>
@@ -1884,6 +2009,13 @@ export default function App() {
                   {m.text}
                 </div>
               ))}
+              {isTyping && (
+                <div className="bubble assistant typing">
+                  <span className="typingDot">●</span>
+                  <span className="typingDot">●</span>
+                  <span className="typingDot">●</span>
+                </div>
+              )}
             </div>
 
             {activeThread.proposed.length ? (
@@ -2134,14 +2266,29 @@ export default function App() {
               {!previewCollapsed ? (
                 <>
                   <div className="previewStage" ref={previewStageRef}>
-                    {previewUrl ? (
+                    {previewCompiling ? (
+                      <div className="previewLoading">
+                        <div className="previewLoadingSpinner">
+                          <span className="spin"><IconRefresh /></span>
+                        </div>
+                        <div className="previewLoadingText">Compiling PDF...</div>
+                        <div className="progressBar">
+                          <div className="progressFill" style={{ width: "60%" }} />
+                        </div>
+                      </div>
+                    ) : previewUrl ? (
                       !pdfRendererAvailable ? (
                         <iframe className="preview" title="PDF Preview" src={previewUrl} />
                       ) : (
                         <canvas className="previewCanvas" ref={pdfCanvasRef} aria-label="PDF Preview canvas" />
                       )
                     ) : (
-                      <div className="previewPlaceholder muted">Compile to see preview.</div>
+                      <div className="previewPlaceholder">
+                        <div className="previewPlaceholderIcon">📄</div>
+                        <div className="previewPlaceholderTitle">No PDF preview yet</div>
+                        <div className="previewPlaceholderText">Click Compile to generate a PDF preview of your document.</div>
+                        <Button onPress={() => void onCompilePreview()} className="previewPlaceholderButton">Compile Now</Button>
+                      </div>
                     )}
                       <div className="previewFloating" role="group" aria-label="Preview controls">
                         <IconButton
@@ -2267,7 +2414,10 @@ export default function App() {
                             </div>
                           ))
                         ) : (
-                          <div className="muted">No comments yet.</div>
+                          <div className="emptyState">
+                            <div className="emptyStateText">No comments yet.</div>
+                            <div className="emptyStateHint">Add notes or feedback about your document. Comments are saved with the project.</div>
+                          </div>
                         )}
                       </div>
                       <div className="row" style={{ padding: 0, marginTop: 8 }}>
@@ -2310,7 +2460,10 @@ export default function App() {
                             </div>
                           ))
                         ) : (
-                          <div className="muted">No logs yet.</div>
+                          <div className="emptyState">
+                            <div className="emptyStateText">No logs yet.</div>
+                            <div className="emptyStateHint">Activity logs track document saves, compiles, and AI interactions automatically.</div>
+                          </div>
                         )}
                       </div>
                     </>
@@ -2549,6 +2702,32 @@ export default function App() {
                         >
                           Connect
                         </Button>
+                      </div>
+                    </div>
+                    <div className="card" style={{ marginTop: 12 }}>
+                      <div className="paneTitle" style={{ marginBottom: 8 }}>
+                        LaTeX Compiler
+                      </div>
+                      <div className="muted" style={{ marginBottom: 8 }}>
+                        Path to LaTeX compiler (tectonic, pdflatex, or latexmk). Leave empty to use auto-detection.
+                      </div>
+                      <div className="row" style={{ padding: 0, flexWrap: "wrap" }}>
+                        <Input
+                          aria-label="LaTeX compiler path"
+                          placeholder="e.g., /usr/bin/tectonic or C:\\Program Files\\tectonic\\tectonic.exe"
+                          value={latexCompilerPath}
+                          onChange={(e) => setLatexCompilerPath((e.target as HTMLInputElement).value)}
+                          style={{ flex: 1, minWidth: "300px" }}
+                        />
+                        <Button
+                          aria-label="Clear LaTeX compiler path"
+                          onPress={() => setLatexCompilerPath("")}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                      <div className="muted" style={{ marginTop: 8 }}>
+                        Auto-detected: tectonic, pdflatex, latexmk (in that order)
                       </div>
                     </div>
                     <div className="card" style={{ marginTop: 12 }}>
@@ -2798,6 +2977,43 @@ export default function App() {
           </Dialog>
         </Modal>
       </ModalOverlay>
+      <ModalOverlay isOpen={shortcutsOpen} onOpenChange={setShortcutsOpen} className="modalBackdrop">
+        <Modal className="modal">
+          <Dialog aria-label="Keyboard Shortcuts">
+            <div className="paneTitle">Keyboard Shortcuts</div>
+            <div className="card" style={{ marginTop: 12 }}>
+              <div className="shortcutRow">
+                <span>Send message</span>
+                <span className="shortcut">Enter</span>
+              </div>
+              <div className="shortcutRow">
+                <span>New line in chat</span>
+                <span className="shortcut">Shift + Enter</span>
+              </div>
+              <div className="shortcutRow">
+                <span>Zoom to fit (PDF)</span>
+                <span className="shortcut">Ctrl/Cmd + 0</span>
+              </div>
+              <div className="shortcutRow">
+                <span>Zoom in (PDF)</span>
+                <span className="shortcut">Ctrl/Cmd + +</span>
+              </div>
+              <div className="shortcutRow">
+                <span>Zoom out (PDF)</span>
+                <span className="shortcut">Ctrl/Cmd + -</span>
+              </div>
+              <div className="shortcutRow">
+                <span>Toggle Vim Mode</span>
+                <span className="shortcut">Settings → Editor</span>
+              </div>
+            </div>
+            <div className="row" style={{ padding: 0, marginTop: 12 }}>
+              <Button onPress={() => setShortcutsOpen(false)}>Close</Button>
+            </div>
+          </Dialog>
+        </Modal>
+      </ModalOverlay>
+
       {toast ? <div className="toast">{toast}</div> : null}
     </div>
   );

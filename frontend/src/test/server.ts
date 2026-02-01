@@ -108,7 +108,7 @@ export const server = setupServer(
     logs.unshift({ id: "log-share", doc_id: doc.id, body: "Shared project", created_at: new Date().toISOString() });
     return HttpResponse.json({ url: `/share/${token}` });
   }),
-  http.get("/api/share/:token", ({ params }) => {
+  http.get("/share/:token", ({ params }) => {
     const docId = shares[String(params.token)];
     if (!doc || doc.id !== docId) {
       return HttpResponse.json(

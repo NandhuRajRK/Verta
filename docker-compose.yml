@@ -1,0 +1,28 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - verta_data:/data
+    environment:
+      - VERTA_DB_PATH=/data/verta.db
+      - VERTA_DATA_DIR=/data
+      - VERTA_WEB_SEARCH_PROVIDER=${VERTA_WEB_SEARCH_PROVIDER:-}
+      - VERTA_WEB_SEARCH_API_KEY=${VERTA_WEB_SEARCH_API_KEY:-}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  verta_data:

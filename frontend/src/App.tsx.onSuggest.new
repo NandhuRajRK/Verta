@@ -1,0 +1,108 @@
+  async function onSuggest() {
+    if (!activeFile) return;
+    const model = selectedModel;
+    if (!model) {
+      notify("Select a model to continue");
+      return;
+    }
+    const prompt = (activeThread?.draft ?? "").trim();
+    if (!prompt) return;
+    await ensureDocId();
+    const userMsg = { id: crypto.randomUUID(), role: "user" as const, text: prompt };
+    // Generate title from first user input if it's still the default
+    const currentThread = threads[activeThreadId];
+    const newTitle = currentThread?.title === "Assistant" && currentThread?.messages.length === 0
+      ? (prompt.length > 30 ? prompt.slice(0, 30) + "..." : prompt)
+      : currentThread?.title;
+    updateThread(activeThreadId, (t) => ({ ...t, messages: [...t.messages, userMsg], draft: "", title: newTitle ?? t.title }));
+
+    const fileList = filteredEntryKeys.length ? filteredEntryKeys.join(", ") : "";
+    let webContext = "";
+    if (webSearchEnabled && prompt) {
+      try {
+        const res = await webSearch(prompt, 5);
+        if (res.results?.length) {
+          webContext =
+            "WEB SEARCH RESULTS:\n" +
+            res.results
+              .map((r, i) => `${i + 1}. ${r.title} (${r.url})${r.snippet ? ` — ${r.snippet}` : ""}`)
+              .join("\n");
+        }
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Web search failed");
+      }
+    }
+    const systemPrompt = [
+      "You are editing a LaTeX/Markdown project.",
+      "Choose the target file based on the request and file list.",
+      "Return ONLY valid JSON with keys: file, patch, message.",
+      "patch must be a unified diff against the target file.",
+      "If you need to create a new file, set file to the new path and make the patch against an empty file.",
+      "Use LaTeX for .tex/.bib and Markdown for .md based on the file extension.",
+      fileList ? `FILES: ${fileList}` : "",
+      webContext,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    setIsTyping(true);
+    setConnectionError(null);
+    try {
+      const resp = await completion({
+        modelConfig: model,
+        sourceLatex: activeFile.content,
+        prompt: `${systemPrompt}\n\nUSER:\n${prompt}`,
+        options: { maxTokens: 4096, timeoutS: 120.0 },
+      });
+      const parsed = parseStructuredPatch(resp.text);
+      const assistantText = parsed?.message ?? (parsed?.file ? `Proposed changes ready for ${parsed.file}.` : "");
+      const assistantMsg = {
+        id: crypto.randomUUID(),
+        role: "assistant" as const,
+        text: assistantText || "Model response could not be parsed into a patch.",
+      };
+      updateThread(activeThreadId, (t) => ({ ...t, messages: [...t.messages, assistantMsg], lastSuggestion: assistantText }));
+      if (!parsed) {
+        updateThread(activeThreadId, (t) => ({
+          ...t,
+          proposed: [],
+          proposedFile: null,
+          proposedPatch: null,
+          proposedText: "Model did not return a valid patch.",
+        }));
+        return;
+      }
+      const target = parsed.file;
+      const entry = workspace.entries[target];
+      const baseContent = entry && entry.type === "file" ? entry.content : "";
+      const isNewFile = !entry || entry.type !== "file";
+      const result = applyUnifiedDiff(baseContent, parsed.patch);
+      updateThread(activeThreadId, (t) => ({
+        ...t,
+        proposedFile: target,
+        proposedPatch: parsed.patch,
+        proposedText: parsed.message ?? (isNewFile ? "Create new file." : ""),
+        proposed: [
+          {
+            file: target,
+            note: parsed.message ?? (prompt.slice(0, 40) || "Edit"),
+            added: result.added,
+            removed: result.removed,
+          },
+        ],
+      }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Request failed";
+      setConnectionError(msg);
+      notify(msg);
+      // Add error message to chat
+      const errorMsg = {
+        id: crypto.randomUUID(),
+        role: "assistant" as const,
+        text: `Error: ${msg}. Click to retry.`,
+      };
+      updateThread(activeThreadId, (t) => ({ ...t, messages: [...t.messages, errorMsg] }));
+    } finally {
+      setIsTyping(false);
+    }
+  }

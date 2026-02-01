@@ -1,14 +1,32 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { within } from "@testing-library/react";
 
 import App from "./App";
 
-test("download button is disabled until preview exists, then triggers download", async () => {
+async function createTexFileWithContent(user: ReturnType<typeof userEvent.setup>, content: string) {
+  await user.click(screen.getByRole("button", { name: /add/i }));
+  const dialog = screen.getByRole("dialog", { name: /new file/i });
+  await user.type(within(dialog).getByLabelText(/file name/i), "main.tex");
+  await user.click(within(dialog).getByRole("button", { name: /^create$/i }));
+
+  const fileButton = await screen.findByRole("button", { name: /main\.tex/i });
+  await user.click(fileButton);
+  const editor = screen.getByRole("textbox", { name: /editor/i }) as HTMLTextAreaElement;
+  await user.clear(editor);
+  await user.type(editor, content);
+}
+
+test(
+  "download button is disabled until preview exists, then triggers download",
+  async () => {
   const user = userEvent.setup();
   render(<App />);
 
   const download = screen.getByRole("button", { name: /download preview/i });
   expect(download).toBeDisabled();
+
+  await createTexFileWithContent(user, "\\documentclass{article}\n\\begin{document}Hi\\end{document}");
 
   // Compile to create previewUrl (MSW returns a PDF blob).
   await user.click(screen.getByRole("button", { name: /^compile$/i }));
@@ -21,16 +39,20 @@ test("download button is disabled until preview exists, then triggers download",
     return el;
   });
 
-  expect(download).not.toBeDisabled();
+  await waitFor(() => expect(download).not.toBeDisabled(), { timeout: 8000 });
   await user.click(download);
 
   expect(clickSpy).toHaveBeenCalled();
   createElSpy.mockRestore();
-});
+  },
+  10000,
+);
 
 test("overflow menu supports fullscreen and open in new window", async () => {
   const user = userEvent.setup();
   render(<App />);
+
+  await createTexFileWithContent(user, "\\documentclass{article}\n\\begin{document}Hi\\end{document}");
 
   await user.click(screen.getByRole("button", { name: /^compile$/i }));
 

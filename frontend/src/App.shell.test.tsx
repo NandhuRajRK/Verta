@@ -5,7 +5,14 @@ import { within } from "@testing-library/react";
 import App from "./App";
 
 test("renders editor shell with files, editor, assistant, and preview panes", async () => {
+  const user = userEvent.setup();
   render(<App />);
+
+  // Welcome screen should be visible first
+  expect(screen.getByText(/welcome to verta/i)).toBeInTheDocument();
+  
+  // Create a new project to proceed
+  await user.click(screen.getByRole("button", { name: /create new project/i }));
 
   expect(screen.getByRole("heading", { name: /verta/i })).toBeInTheDocument();
 
@@ -18,6 +25,9 @@ test("renders editor shell with files, editor, assistant, and preview panes", as
 test("can create a file and switch active file", async () => {
   const user = userEvent.setup();
   render(<App />);
+
+  // Create a new project first
+  await user.click(screen.getByRole("button", { name: /create new project/i }));
 
   await user.click(screen.getByRole("button", { name: /add/i }));
   const dialog = screen.getByRole("dialog", { name: /new file/i });
